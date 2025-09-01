@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import { commands } from "./commands"
+import { currDirPath } from "./kernel/Filesystem"
 
 type CursorState = {
     shown: boolean
@@ -14,6 +15,7 @@ const cursorChar = <>&#9608;</>
 const ignoredKeys = ['ArrowUp', 'ArrowDown', 'Alt', 'Control', 'Enter', 'Escape', 'PageUp', 'PageDown', 'Insert', 'ScrollLock', 'Pause', 'Print', 'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12']
 const specialKeys = [...ignoredKeys, 'Backspace', 'ArrowLeft', 'ArrowRight', 'Delete', 'End', 'Home', 'Del', 'Tab']
 let inputHistory = ['']
+let keyIndex = 0
 
 export default function Terminal() {
     const [cursor, setCursor] = useState<CursorState>({shown: true, hidden: false, position: 0})
@@ -176,8 +178,8 @@ export default function Terminal() {
         return <>
             {outputHistory.map((output, idx) => 
                 <span key={`output-${idx}`}>
-                    {output.source === 'input' ? <>&gt;&nbsp;</> : <>&nbsp;&nbsp;</>}
-                    {output.text}
+                    {output.source === 'input' ? '> ' : '  '}
+                    {output.text.replaceAll('\n', '\n  ')}
                     <br/>
                 </span>)}
             </>
@@ -186,7 +188,7 @@ export default function Terminal() {
 
     return (
       <div className='terminal'>
-        <pre>{outputText()}&gt;&nbsp;{textInInput()}</pre>
+        <pre style={{whiteSpace: "pre-wrap"}}>{outputText()}{currDirPath}&nbsp;&gt;&nbsp;{textInInput()}</pre>
       </div>
     )
 }
