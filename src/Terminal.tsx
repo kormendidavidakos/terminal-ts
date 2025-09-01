@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { commands } from "./commands"
-import { createFile, currDir, currDirPath, getFile, writeToFile } from "./kernel/Filesystem"
+import { createFile, currDir, currDirPath, getByPath, getFile, writeToFile } from "./kernel/Filesystem"
+import { tokenize, type ControlToken, type Token } from "./Tokenizer"
 
 type CursorState = {
     shown: boolean
@@ -53,33 +54,76 @@ export default function Terminal() {
         setCursorOffset(0)
     }, [cursorOffset])
 
-    function parseCommand(command: string): string|void{
+    function parseCommand(tokens: Token[]): string|void {
+        if (tokens.length === 0)
+            return
+
+        const command = tokens[0].value
+        const args = tokens.slice(1).map(token => token.value)
+
+        if (command === 'clear'){
+            // TODO: take clear command here
+            return
+        }
+        if (!commands[command]){
+            return `Unknown command: ${command}`
+        }
+
+        return commands[command](...args)
+    }
+
+    function parseInput(command: string): string|void{
         command = command.trim()
         if (command === '')
             return
-        const commandParts = command.split(/\s/)
-        const name = commandParts[0]
 
-        const hasRedirection = commandParts.includes('>')
-        const argsEnd = hasRedirection ? commandParts.indexOf('>') : commandParts.length
-        const args = commandParts.slice(1, argsEnd)
+        const tokens = tokenize(command)
+        if (tokens[0].type !== 'command')
+            return `Panic: ${command} doesn't start with a command`
 
-        if (hasRedirection && commandParts.indexOf('>') === commandParts.length - 1)
-            return `Must specify a file for redirection`
+        const groups: Token[][] = [[]]
+        const controlTokens: ControlToken[] = []
+        for (const token of tokens) {
+            if (token.type !== 'control')
+                groups.at(-1)?.push(token)
+            else {
+                groups.push([])
+                controlTokens.push(token)
+            }
+        }
 
-        if (!commands[name])
-            return `Unknown command: "${name}"`
-        const commandResult = commands[name](...args)
-        if (!hasRedirection)
-            return commandResult
+        const result = parseCommand(groups[0])
+        if (!controlTokens.length || !['>', '>>'].includes(controlTokens[0].value)  )
+            return result
 
-        const targetFileName = commandParts[commandParts.indexOf('>') + 1]
-        let targetFile = getFile(targetFileName)
-        if (targetFile === null)
-            targetFile = createFile(currDir, targetFileName)
+        if (groups.length < 2 || groups[1].length === 0)
+            return 'Invalid redirection'
 
-        writeToFile(targetFile, commandResult)
-        return ''
+        if (groups[1][0].type !== 'path'){
+            groups[1][0] = {type: 'path', 'value': './' + groups[1][0].value}
+        }
+
+        const targetFile = groups[1][0].value
+        let fd = getByPath(targetFile)
+        if (fd?.type === 'dir')
+            return `Target is a directory: ${targetFile}`
+        if (fd === null){
+            fd = getByPath(targetFile.slice(0, targetFile.lastIndexOf('/') + 1))
+            if (fd === null || fd.type !== 'dir')
+                return `No such file or directory1: ${targetFile}`
+            fd = createFile(fd, targetFile.slice(targetFile.lastIndexOf('/') + 1))
+        }
+        
+        switch (controlTokens[0].value) {
+            case '>':
+                fd.content = result ?? ''
+                break
+            case '>>':
+                fd.content += result ?? ''
+                break
+            default:
+                break
+        }
     }
 
     function keydownEvent(event: KeyboardEvent){
@@ -126,7 +170,7 @@ export default function Terminal() {
 
                     const newHistory: Output[] = [...prev, {source: 'input', text: prevInput}]
 
-                    const commandOutput = parseCommand(prevInput)
+                    const commandOutput = parseInput(prevInput)
                     if (commandOutput !== undefined)
                         newHistory.push({source: "command", text: commandOutput})
 

@@ -70,6 +70,38 @@ export function writeToFile(file: FileNode, content: string){
     file.content = content
 }
 
+export function getByPath(path: string): FileNode | DirectoryNode | null {
+    if (!path.startsWith('/') && !path.startsWith('./') && !path.startsWith('../'))
+        path = './' + path
+
+    let currentSearch = fsRoot
+    if (path.startsWith('./')){
+        currentSearch = currDir
+        path = path.slice(1)
+    }
+    else if (path.startsWith('..')){
+        currentSearch = currDir.parent
+        path = path.slice(2)
+    }
+
+    let pathSplit = path.split('/').filter(x => x !== '')
+    for (let idx = 0; idx < pathSplit.length; idx++) {
+        const pathPart = pathSplit[idx];
+        if (pathPart == '..'){
+            currentSearch = currentSearch.parent
+            continue
+        }
+
+        const target = currentSearch.content[pathPart]
+        if (!target || target.type === 'file' && idx < pathSplit.length - 1)
+            return null
+        currentSearch = target as DirectoryNode
+    }
+    
+
+    return currentSearch as DirectoryNode | FileNode
+}
+
 const rootCreator: Partial<DirectoryNode> = {type: 'dir', content: {}}
 rootCreator.parent = rootCreator as DirectoryNode
 

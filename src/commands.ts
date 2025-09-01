@@ -1,6 +1,6 @@
-import { createDirectory, createFile, currDir, getNode, removeNode, setCurrentDirectory, type DirectoryNode } from "./kernel/Filesystem"
+import { createDirectory, createFile, currDir, getByPath, getNode, removeNode, setCurrentDirectory, type DirectoryNode } from "./kernel/Filesystem"
 
-type CommandFunctionType = (...args: string[]) => string
+type CommandFunctionType = (...args: string[]) => string|void
 
 function echo(...args: string[]): string {
     return args.join(' ')
@@ -10,11 +10,11 @@ function ls(...args: string[]): string {
     return Object.entries(currDir.content).map(([key, val]) => `${key}: ${val.type}`).join('\n')
 }
 
-function touch(...args: string[]): string {
+function touch(...args: string[]): string|void {
     if (args.length === 0)
         return 'Must specify a filename'
     createFile(currDir, args[0])
-    return ''
+    return
 }
 
 function mkdir(...args: string[]): string {
@@ -28,35 +28,37 @@ function mkdir(...args: string[]): string {
 function cat(...args: string[]): string {
     if (args.length === 0)
         return 'Must specify a filename'
-    const file = currDir.content[args[0]]
-    if (!file || file.type !== 'file')
-        return 'File does not exist'
 
-    return file.content
+    const target = getByPath(args[0])
+    if (target === null || target.type !== 'file')
+        return `No such file.`
+
+    return target.content
 }
 
-function cd(...args: string[]): string {
+function cd(...args: string[]): string|void {
     if (args.length === 0)
         return 'Must specify a directory name'
-    if (args[0] === '..')
-        setCurrentDirectory(currDir.parent)
-    else if (!currDir.content[args[0]] || currDir.content[args[0]].type !== 'dir')
-        return 'Directory does not exist'
-    else
-        setCurrentDirectory(currDir.content[args[0]] as DirectoryNode)
+    
+    const target = getByPath(args[0])
+    if (target === null || target.type !== 'dir')
+        return `No such directory.`
 
-    return ''
+    setCurrentDirectory(target)
+
+    return
 }
 
-function rm(...args: string[]): string {
+function rm(...args: string[]): string|void {
     if (args.length === 0)
         return 'Must specify a file or directory name'
-    const node = getNode(args[0])
-    if (node === null)
+
+    const target = getByPath(args[0])
+    if (target === null)
         return `No such file or  directory`
 
-    removeNode(node)
-    return ''
+    removeNode(target)
+    return
 }
 
 
