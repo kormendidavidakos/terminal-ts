@@ -1,4 +1,4 @@
-import { createDirectory, createFile, currDir, fsRoot, setCurrentDirectory, type DirectoryNode } from "./kernel/Filesystem"
+import { createDirectory, createFile, currDir, getNode, removeNode, setCurrentDirectory, type DirectoryNode } from "./kernel/Filesystem"
 
 type CommandFunctionType = (...args: string[]) => string
 
@@ -48,6 +48,18 @@ function cd(...args: string[]): string {
     return ''
 }
 
+function rm(...args: string[]): string {
+    if (args.length === 0)
+        return 'Must specify a file or directory name'
+    const node = getNode(args[0])
+    if (node === null)
+        return `No such file or  directory`
+
+    removeNode(node)
+    return ''
+}
+
+
 
 export const commands: {[k: string]: CommandFunctionType} = {
     'echo': echo,
@@ -55,5 +67,6 @@ export const commands: {[k: string]: CommandFunctionType} = {
     'touch': touch,
     'mkdir': mkdir,
     'cd': cd,
-    'cat': cat
+    'cat': cat,
+    'rm': rm
 }

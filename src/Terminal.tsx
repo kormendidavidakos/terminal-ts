@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { commands } from "./commands"
-import { currDirPath } from "./kernel/Filesystem"
+import { createFile, currDir, currDirPath, getFile, writeToFile } from "./kernel/Filesystem"
 
 type CursorState = {
     shown: boolean
@@ -12,10 +12,9 @@ type Output = {
     text: string
 }
 const cursorChar = <>&#9608;</>
-const ignoredKeys = ['ArrowUp', 'ArrowDown', 'Alt', 'Control', 'Enter', 'Escape', 'PageUp', 'PageDown', 'Insert', 'ScrollLock', 'Pause', 'Print', 'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12']
+const ignoredKeys = ['ArrowUp', 'ArrowDown', 'Alt', 'Control', 'Enter', 'Escape', 'PageUp', 'PageDown', 'Insert', 'ScrollLock', 'Pause', 'Print', 'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12', 'Shift']
 const specialKeys = [...ignoredKeys, 'Backspace', 'ArrowLeft', 'ArrowRight', 'Delete', 'End', 'Home', 'Del', 'Tab']
 let inputHistory = ['']
-let keyIndex = 0
 
 export default function Terminal() {
     const [cursor, setCursor] = useState<CursorState>({shown: true, hidden: false, position: 0})
@@ -60,12 +59,27 @@ export default function Terminal() {
             return
         const commandParts = command.split(/\s/)
         const name = commandParts[0]
-        const args = commandParts.slice(1)
+
+        const hasRedirection = commandParts.includes('>')
+        const argsEnd = hasRedirection ? commandParts.indexOf('>') : commandParts.length
+        const args = commandParts.slice(1, argsEnd)
+
+        if (hasRedirection && commandParts.indexOf('>') === commandParts.length - 1)
+            return `Must specify a file for redirection`
 
         if (!commands[name])
             return `Unknown command: "${name}"`
+        const commandResult = commands[name](...args)
+        if (!hasRedirection)
+            return commandResult
 
-        return commands[name](...args)
+        const targetFileName = commandParts[commandParts.indexOf('>') + 1]
+        let targetFile = getFile(targetFileName)
+        if (targetFile === null)
+            targetFile = createFile(currDir, targetFileName)
+
+        writeToFile(targetFile, commandResult)
+        return ''
     }
 
     function keydownEvent(event: KeyboardEvent){
